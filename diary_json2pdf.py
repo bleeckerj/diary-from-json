@@ -15,6 +15,7 @@ logging.getLogger("fpdf").setLevel(logging.WARNING)
 logging.getLogger("fontTools").setLevel(logging.WARNING)
 logging.getLogger("PIL").setLevel(logging.WARNING)
 
+GAP_BETWEEN_ENTRIES_MM = 12  # or any value in millimeters you prefer
 
 PAGE_SIZES = {
     "A4": (210, 297),
@@ -54,8 +55,7 @@ def pt_to_mm(pt):
     return pt * 0.352778
 
 def add_entry_to_pdf(pdf, entry, config):
-    pdf.add_page()
-    pdf.set_auto_page_break(auto=True, margin=15)
+    # Do not start a new page for each entry; maintain continuous flow
     margin = 15
     page_w = config["page_size"][0]
     avail_w_mm = page_w - 2 * margin
@@ -87,32 +87,33 @@ def add_entry_to_pdf(pdf, entry, config):
                 f"Dateline: {repr(entry['dateline'])}\nFull text_obj: {repr(text_obj)}"
             )
 
-    # Images: use a unique buffer for each image
+    # Images: scale to available width, maintain aspect ratio
     for idx, img in enumerate(entry.get("images", [])):
         image_type = img.get("type", "png")
         image_data = img.get("image_data", "")
         pil_img = decode_base64_image(image_data, image_type)
         if pil_img:
             page_w, page_h = config["page_size"]
-            max_w_mm = page_w - 30
-            max_h_mm = page_h / 2
-            max_w_px = mm_to_px(max_w_mm)
-            max_h_px = mm_to_px(max_h_mm)
+            max_w_mm = page_w - 2 * margin  # scale to full available width
             w, h = pil_img.size
-            ratio = min(max_w_px / w, max_h_px / h, 1)
-            new_w_px, new_h_px = int(w * ratio), int(h * ratio)
+            max_w_px = mm_to_px(max_w_mm)
+            ratio = max_w_px / w if w > 0 else 1
+            new_w_px = int(w * ratio)
+            new_h_px = int(h * ratio)
             pil_img = pil_img.resize((new_w_px, new_h_px), Image.LANCZOS)
             img_buffer = io.BytesIO()
             pil_img.save(img_buffer, format="JPEG")
             img_buffer.seek(0)
             try:
-                pdf.image(img_buffer, x=15, w=px_to_mm(new_w_px), h=px_to_mm(new_h_px))
-                pdf.ln(line_height_mm)
+                pdf.image(img_buffer, x=margin, w=max_w_mm, h=px_to_mm(new_h_px))
+                pdf.ln(px_to_mm(new_h_px) + line_height_mm)
             except Exception as e:
                 logging.error(
                     f"[Image Error] {e}\n"
                     f"Image index: {idx}\nDateline: {repr(entry['dateline'])}\nImage metadata: {repr(img)}"
                 )
+    # Add vertical gap after each diary entry
+    pdf.ln(GAP_BETWEEN_ENTRIES_MM)
 def create_pdf_from_json(json_path, output_pdf, page_size="A5", date_font="DejaVuSans", date_font_size=18, text_font="DejaVuSans", text_font_size=12, line_spacing=1.3):
     config = {
         "page_size": PAGE_SIZES.get(page_size.upper(), PAGE_SIZES["A5"]),
@@ -125,7 +126,8 @@ def create_pdf_from_json(json_path, output_pdf, page_size="A5", date_font="DejaV
     pdf = FPDF(unit="mm", format=config["page_size"])
     # Register DejaVuSans font for Unicode support
     font_path = "/Users/julian/Dropbox (Personal)/Projects By Year/@2025/OMATA Process Diary/ProcessDiaryEntries/dejavu-fonts-ttf-2.37/ttf/DejaVuSans.ttf"
-    pdf.add_font("DejaVuSans", "", font_path, uni=True)
+    pdf.add_font("DejaVuSans", "", font_path)
+    pdf.add_page()  # Ensure at least one page is open before writing
     # Load diary JSON data
     with open(json_path, "r", encoding="utf-8") as f:
         diary = json.load(f)
