@@ -65,17 +65,19 @@ def add_entry_to_pdf(pdf, entry, config):
 
     # Date: colored rectangle full width (respecting margins), white text
     rect_height_mm = pt_to_mm(config["date_font_size"]) * config["line_spacing"] * 1.5
+    date_left_pad_mm = 2.5  # Padding between left edge and date text
     pdf.set_fill_color(0, 0, 0)  # Black in RGB
     pdf.rect(x=margin, y=pdf.get_y(), w=avail_w_mm, h=rect_height_mm, style='F')
-    pdf.set_xy(margin, pdf.get_y())
+    pdf.set_xy(margin + date_left_pad_mm, pdf.get_y())
     pdf.set_text_color(255, 255, 255)  # White text (RGB)
     pdf.set_font(config["date_font"], size=config["date_font_size"])
     date_text = entry["dateline"]
-    pdf.cell(avail_w_mm, rect_height_mm, date_text, ln=True, align='L')
+    pdf.cell(avail_w_mm - date_left_pad_mm, rect_height_mm, date_text, align='L')
     pdf.set_text_color(0, 0, 0)  # Reset to black for body text
-    pdf.ln(rect_height_mm * 0.8)
+    pdf.ln(rect_height_mm * 2)
 
     # Text: treat each text_obj as a paragraph, let multi_cell handle wrapping
+    pdf.set_xy(margin, pdf.get_y())  # Nudge text to align with left edge of rectangle
     pdf.set_font(config["text_font"], size=config["text_font_size"])
     line_height_mm = pt_to_mm(config["text_font_size"]) * config["line_spacing"]
     for text_obj in entry["text"]:
