@@ -5,6 +5,7 @@ import io
 import os
 import base64
 import logging 
+import argparse
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -54,21 +55,23 @@ def pt_to_mm(pt):
     """Convert points to millimeters."""
     return pt * 0.352778
 
+def inch_to_mm(inch):
+    return inch * 25.4
+
 def add_entry_to_pdf(pdf, entry, config):
-    # Do not start a new page for each entry; maintain continuous flow
-    margin = 15
+    margin = config.get("margin_mm", 8.89)  # Default to 0.35 inch in mm
     page_w = config["page_size"][0]
     avail_w_mm = page_w - 2 * margin
 
-    # Date: colored rectangle full width, white text
+    # Date: colored rectangle full width (respecting margins), white text
     rect_height_mm = pt_to_mm(config["date_font_size"]) * config["line_spacing"] * 1.5
     pdf.set_fill_color(0, 0, 0)  # Black in RGB
-    pdf.rect(x=0, y=pdf.get_y(), w=page_w, h=rect_height_mm, style='F')
-    pdf.set_xy(0, pdf.get_y())
+    pdf.rect(x=margin, y=pdf.get_y(), w=avail_w_mm, h=rect_height_mm, style='F')
+    pdf.set_xy(margin, pdf.get_y())
     pdf.set_text_color(255, 255, 255)  # White text (RGB)
     pdf.set_font(config["date_font"], size=config["date_font_size"])
     date_text = entry["dateline"]
-    pdf.cell(page_w, rect_height_mm, date_text, ln=True, align='L')
+    pdf.cell(avail_w_mm, rect_height_mm, date_text, ln=True, align='L')
     pdf.set_text_color(0, 0, 0)  # Reset to black for body text
     pdf.ln(rect_height_mm * 0.2)
 
@@ -78,12 +81,6 @@ def add_entry_to_pdf(pdf, entry, config):
     for text_obj in entry["text"]:
         paragraph = text_obj["text"]
         try:
-            logging.debug(
-                f"[MULTICELL] pdf.w: {pdf.w} mm | margin: {margin} mm | "
-                f"Available width for multi_cell: {avail_w_mm} mm | "
-                f"Font: {config['text_font']} | Font size: {config['text_font_size']} pt | "
-                f"Line height: {line_height_mm} mm | Text length: {len(paragraph)}"
-            )
             pdf.multi_cell(avail_w_mm, line_height_mm, paragraph)
             pdf.ln(line_height_mm)
         except Exception as e:
@@ -120,14 +117,17 @@ def add_entry_to_pdf(pdf, entry, config):
                 )
     # Add vertical gap after each diary entry
     pdf.ln(GAP_BETWEEN_ENTRIES_MM)
-def create_pdf_from_json(json_path, output_pdf, page_size="A5", date_font="DejaVuSans", date_font_size=18, text_font="DejaVuSans", text_font_size=12, line_spacing=1.3):
+
+def create_pdf_from_json(json_path, output_pdf, page_size="A5", date_font="DejaVuSans", date_font_size=18, text_font="DejaVuSans", text_font_size=12, line_spacing=1.3, margin_inch=0.35):
+    margin_mm = inch_to_mm(margin_inch)
     config = {
         "page_size": PAGE_SIZES.get(page_size.upper(), PAGE_SIZES["A5"]),
         "date_font": date_font,
         "date_font_size": date_font_size,
         "text_font": text_font,
         "text_font_size": text_font_size,
-        "line_spacing": line_spacing
+        "line_spacing": line_spacing,
+        "margin_mm": margin_mm
     }
     pdf = FPDF(unit="mm", format=config["page_size"])
     # Register DejaVuSans font for Unicode support
@@ -143,6 +143,9 @@ def create_pdf_from_json(json_path, output_pdf, page_size="A5", date_font="DejaV
     logging.info(f"Created {output_pdf}")
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--margin", type=float, default=0.35, help="Margin in inches (default: 0.35)")
+    args = parser.parse_args()
     create_pdf_from_json(
         "OMATA-NOTES  Continued At Week 182.json",
         "OMATA_Diary_Print.pdf",
@@ -151,5 +154,6 @@ if __name__ == "__main__":
         date_font_size=12,
         text_font="DejaVuSans",
         text_font_size=9,
-        line_spacing=1
+        line_spacing=1,
+        margin_inch=args.margin
     )
