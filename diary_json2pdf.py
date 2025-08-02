@@ -28,11 +28,12 @@ GAP_BETWEEN_ENTRIES_MM = 12  # or any value in millimeters you prefer
 PAGE_SIZES = {
     "A4": (210, 297),
     "A5": (148, 210),
-    "A6": (105, 148),
+    "A6": (105, 148), # 4.13" x 5.83"
     "A7": (74, 105),
     "LETTER": (216, 279),
     "LEGAL": (216, 356),
-    "TABLOID": (279, 432)
+    "TABLOID": (279, 432),
+    "POCKET": (107.95, 174.498), # 4.25" x 6.87"
 }
 
 DPI = 300  # Print resolution
@@ -100,11 +101,15 @@ def add_entry_to_pdf(pdf, entry, config):
     fill_color = config.get("rect_fill_color", (0, 0, 0))  # Default black
     pdf.set_fill_color(*fill_color)
 
-
-    pdf.rounded_rect(rect_x, rect_y, rect_w, rect_height_mm, 2, 'F', '13')
+    # Determine dateline text color based on fill contrast (simple luminance check)
+    r, g, b = fill_color
+    luminance = 0.299 * r + 0.587 * g + 0.114 * b
+    dateline_text_color = (0, 0, 0) if luminance > 183 else (255, 255, 255)
+    logging.debug(f"Dateline text color: {dateline_text_color} based on fill color {fill_color} and luminance {luminance}")
+    pdf.rounded_rect(rect_x, rect_y, rect_w, rect_height_mm, rect_corner_radius, 'F', '13')
 
     pdf.set_xy(margin + date_left_pad_mm, rect_y)
-    pdf.set_text_color(255, 255, 255)
+    pdf.set_text_color(*dateline_text_color)
     pdf.set_font(config["date_font"], size=config["date_font_size"])
     date_text = entry["dateline"]
     pdf.cell(avail_w_mm - date_left_pad_mm, rect_height_mm, date_text, align='L')
@@ -114,6 +119,7 @@ def add_entry_to_pdf(pdf, entry, config):
     # Text
     pdf.set_xy(margin, pdf.get_y())
     pdf.set_font(config["text_font"], size=config["text_font_size"])
+    logging.debug(f"Adding text for entry: {config['text_font']}")
     for text_obj in entry["text"]:
         paragraph = text_obj["text"]
         try:
@@ -166,10 +172,21 @@ def create_pdf_from_json(json_path, output_pdf=None, page_size="A5", date_font="
         "rect_fill_color": rect_fill_color
     }
     pdf = FPDF(unit="mm", format=config["page_size"])
+    
     font_path = "/Users/julian/Dropbox (Personal)/Projects By Year/@2025/OMATA Process Diary/ProcessDiaryEntries/WarblerTextV1.2-Regular.otf"
     pdf.add_font("WarblerText", "", font_path)
+    
+    nyt_font_path = "/Users/julian/Dropbox (Personal)/Projects By Year/@2025/OMATA Process Diary/ProcessDiaryEntries/nyt-cheltenham-normal.ttf"
+    
+    imperial_font_path = "/Users/julian/Dropbox (Personal)/Projects By Year/@2025/OMATA Process Diary/ProcessDiaryEntries/imperial-italic-600.ttf"
+    
+    pdf.add_font("imperial-italic-600", "", imperial_font_path)
+    
+    pdf.add_font("nyt-cheltenham-normal", "", nyt_font_path)
+    
     date_font_path = "/Users/julian/Dropbox (Personal)/Projects By Year/@2025/OMATA Process Diary/ProcessDiaryEntries/3270NerdFont-Regular.ttf"
     pdf.add_font("3270NerdFont-Regular", "", date_font_path)
+    
     pdf.add_page()
     with open(json_path, "r", encoding="utf-8") as f:
         diary = json.load(f)
@@ -178,7 +195,9 @@ def create_pdf_from_json(json_path, output_pdf=None, page_size="A5", date_font="
     if not output_pdf:
         base, _ = os.path.splitext(os.path.basename(json_path))
         base = re.sub(r'\s+', '_', base)
-        output_pdf = f"{base}_{page_size.upper()}.pdf"
+        # Output PDF should be in the same directory as the input file
+        input_dir = os.path.dirname(json_path)
+        output_pdf = os.path.join(input_dir, f"{base}_{page_size.upper()}.pdf")
     pdf.output(output_pdf)
     logging.info(f"Created {output_pdf}")
 
@@ -188,11 +207,11 @@ if __name__ == "__main__":
     parser.add_argument("--margin", type=float, default=0.35, help="Margin in inches (default: 0.35)")
     parser.add_argument("--page_size", type=str, default="A5", help="Page size (A4, A5, A6, etc.)")
     parser.add_argument("--date_font", type=str, default="3270NerdFont-Regular", help="Font for date line")
-    parser.add_argument("--date_font_size", type=int, default=11, help="Font size for date line")
+    parser.add_argument("--date_font_size", type=float, default=11, help="Font size for date line")
     parser.add_argument("--text_font", type=str, default="WarblerText", help="Font for text")
     parser.add_argument("--text_font_size", type=int, default=9, help="Font size for text")
     parser.add_argument("--line_spacing", type=float, default=1.2, help="Line spacing multiplier")
-    parser.add_argument("--rect_corner_radius_mm", type=float, default=2, help="Corner radius for left corners of date rectangle (mm)")
+    parser.add_argument("--rect_corner_radius_mm", type=float, default=1, help="Corner radius for left corners of date rectangle (mm)")
     parser.add_argument("--rect_fill_color", type=int, nargs=3, default=[0,0,0], help="Fill color for date rectangle as three RGB values, e.g. --rect_fill_color 30 30 30")
     args = parser.parse_args()
     create_pdf_from_json(
