@@ -1,0 +1,147 @@
+from fpdf import FPDF
+from PIL import Image
+import json
+import io
+import os
+import base64
+import logging 
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s %(levelname)s [%(name)s][Line %(lineno)d]: %(message)s'
+)
+
+logging.getLogger("fpdf").setLevel(logging.WARNING)
+logging.getLogger("fontTools").setLevel(logging.WARNING)
+logging.getLogger("PIL").setLevel(logging.WARNING)
+
+
+PAGE_SIZES = {
+    "A4": (210, 297),
+    "A5": (148, 210),
+    "LETTER": (216, 279),
+    "LEGAL": (216, 356),
+    "TABLOID": (279, 432)
+}
+
+DPI = 300  # Print resolution
+
+def mm_to_px(mm):
+    return int(mm / 25.4 * DPI)
+
+def px_to_mm(px):
+    return px * 25.4 / DPI
+
+def decode_base64_image(image_data, image_type):
+    # Extract base64 from markdown-style ![](data:image/TYPE;base64,....)
+    import re
+    match = re.search(r'base64,([A-Za-z0-9+/=\n\r]+)\)', image_data)
+    if not match:
+        return None
+    b64 = match.group(1)
+    try:
+        img_bytes = base64.b64decode(b64)
+        img = Image.open(io.BytesIO(img_bytes))
+        # Convert to CMYK for print
+        if img.mode != "CMYK":
+            img = img.convert("CMYK")
+        return img
+    except Exception as e:
+        logging.error(f"decode_base64_image error: {e}\nImage data: {image_data[:100]}...")
+        return None
+def pt_to_mm(pt):
+    """Convert points to millimeters."""
+    return pt * 0.352778
+
+def add_entry_to_pdf(pdf, entry, config):
+    pdf.add_page()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    margin = 15
+    page_w = config["page_size"][0]
+    avail_w_mm = page_w - 2 * margin
+
+    # Date
+    pdf.set_font(config["date_font"], size=config["date_font_size"])
+    date_text = entry["dateline"]
+    pdf.cell(0, pt_to_mm(config["date_font_size"]), date_text, ln=True)
+    pdf.ln(pt_to_mm(config["date_font_size"]) * config["line_spacing"] / 2)
+
+    # Text: treat each text_obj as a paragraph, let multi_cell handle wrapping
+    pdf.set_font(config["text_font"], size=config["text_font_size"])
+    line_height_mm = pt_to_mm(config["text_font_size"]) * config["line_spacing"]
+    for text_obj in entry["text"]:
+        paragraph = text_obj["text"]
+        try:
+            logging.debug(
+                f"[MULTICELL] pdf.w: {pdf.w} mm | margin: {margin} mm | "
+                f"Available width for multi_cell: {avail_w_mm} mm | "
+                f"Font: {config['text_font']} | Font size: {config['text_font_size']} pt | "
+                f"Line height: {line_height_mm} mm | Text length: {len(paragraph)}"
+            )
+            pdf.multi_cell(avail_w_mm, line_height_mm, paragraph)
+            pdf.ln(line_height_mm)
+        except Exception as e:
+            logging.error(
+                f"[FPDFException] {e}\n"
+                f"Problematic text: {repr(paragraph)}\n"
+                f"Dateline: {repr(entry['dateline'])}\nFull text_obj: {repr(text_obj)}"
+            )
+
+    # Images: use a unique buffer for each image
+    for idx, img in enumerate(entry.get("images", [])):
+        image_type = img.get("type", "png")
+        image_data = img.get("image_data", "")
+        pil_img = decode_base64_image(image_data, image_type)
+        if pil_img:
+            page_w, page_h = config["page_size"]
+            max_w_mm = page_w - 30
+            max_h_mm = page_h / 2
+            max_w_px = mm_to_px(max_w_mm)
+            max_h_px = mm_to_px(max_h_mm)
+            w, h = pil_img.size
+            ratio = min(max_w_px / w, max_h_px / h, 1)
+            new_w_px, new_h_px = int(w * ratio), int(h * ratio)
+            pil_img = pil_img.resize((new_w_px, new_h_px), Image.LANCZOS)
+            img_buffer = io.BytesIO()
+            pil_img.save(img_buffer, format="JPEG")
+            img_buffer.seek(0)
+            try:
+                pdf.image(img_buffer, x=15, w=px_to_mm(new_w_px), h=px_to_mm(new_h_px))
+                pdf.ln(line_height_mm)
+            except Exception as e:
+                logging.error(
+                    f"[Image Error] {e}\n"
+                    f"Image index: {idx}\nDateline: {repr(entry['dateline'])}\nImage metadata: {repr(img)}"
+                )
+def create_pdf_from_json(json_path, output_pdf, page_size="A5", date_font="DejaVuSans", date_font_size=18, text_font="DejaVuSans", text_font_size=12, line_spacing=1.3):
+    config = {
+        "page_size": PAGE_SIZES.get(page_size.upper(), PAGE_SIZES["A5"]),
+        "date_font": date_font,
+        "date_font_size": date_font_size,
+        "text_font": text_font,
+        "text_font_size": text_font_size,
+        "line_spacing": line_spacing
+    }
+    pdf = FPDF(unit="mm", format=config["page_size"])
+    # Register DejaVuSans font for Unicode support
+    font_path = "/Users/julian/Dropbox (Personal)/Projects By Year/@2025/OMATA Process Diary/ProcessDiaryEntries/dejavu-fonts-ttf-2.37/ttf/DejaVuSans.ttf"
+    pdf.add_font("DejaVuSans", "", font_path, uni=True)
+    # Load diary JSON data
+    with open(json_path, "r", encoding="utf-8") as f:
+        diary = json.load(f)
+    for entry in diary["entries"]:
+        add_entry_to_pdf(pdf, entry, config)
+    pdf.output(output_pdf)
+    logging.info(f"Created {output_pdf}")
+
+if __name__ == "__main__":
+    create_pdf_from_json(
+        "OMATA-NOTES  Continued At Week 182.json",
+        "OMATA_Diary_Print.pdf",
+        page_size="A5",
+        date_font="DejaVuSans",
+        date_font_size=12,
+        text_font="DejaVuSans",
+        text_font_size=9,
+        line_spacing=1
+    )
