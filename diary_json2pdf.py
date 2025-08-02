@@ -158,6 +158,20 @@ def add_entry_to_pdf(pdf, entry, config):
                 )
     pdf.ln(GAP_BETWEEN_ENTRIES_MM)
 
+def get_date_range_from_json(json_path):
+    """Extract the first and last date from the JSON entries."""
+    import json
+    with open(json_path, "r", encoding="utf-8") as f:
+        diary = json.load(f)
+    dates = []
+    for entry in diary.get("entries", []):
+        dateline = entry.get("dateline")
+        if dateline:
+            dates.append(dateline)
+    if dates:
+        return dates[0], dates[-1]
+    return None, None
+
 def create_pdf_from_json(json_path, output_pdf=None, page_size="A5", date_font="3270NerdFont-Regular", date_font_size=18, text_font="WarblerText", text_font_size=12, line_spacing=1.3, margin_inch=0.35, rect_corner_radius_mm=2, rect_fill_color=(0,0,0)):
     margin_mm = inch_to_mm(margin_inch)
     config = {
@@ -190,8 +204,31 @@ def create_pdf_from_json(json_path, output_pdf=None, page_size="A5", date_font="
     pdf.add_page()
     with open(json_path, "r", encoding="utf-8") as f:
         diary = json.load(f)
+
+    # Metadata collection
+    num_images = 0
+    total_image_bytes = 0
+    total_words = 0
+
+    with open(json_path, "r", encoding="utf-8") as f:
+        diary = json.load(f)
+
     for entry in diary["entries"]:
+        # Count words in text
+        for text_obj in entry.get("text", []):
+            paragraph = text_obj.get("text", "")
+            total_words += len(paragraph.split())
+        # Count images and their sizes
+        for img in entry.get("images", []):
+            num_images += 1
+            image_data = img.get("image_data", "")
+            try:
+                # Only count base64 size, not decoded image size
+                total_image_bytes += len(image_data.encode("utf-8"))
+            except Exception:
+                pass
         add_entry_to_pdf(pdf, entry, config)
+
     if not output_pdf:
         base, _ = os.path.splitext(os.path.basename(json_path))
         base = re.sub(r'\s+', '_', base)
@@ -200,6 +237,19 @@ def create_pdf_from_json(json_path, output_pdf=None, page_size="A5", date_font="
         output_pdf = os.path.join(input_dir, f"{base}_{page_size.upper()}.pdf")
     pdf.output(output_pdf)
     logging.info(f"Created {output_pdf}")
+
+    # Write metadata file
+    metadata_path = os.path.splitext(output_pdf)[0] + ".metadata.txt"
+    num_pages = pdf.page_no()
+    first_date, last_date = get_date_range_from_json(json_path)
+    date_range = f"{first_date} - {last_date}" if first_date and last_date else ""
+    with open(metadata_path, "w", encoding="utf-8") as meta_f:
+        meta_f.write(f"Number of pages: {num_pages}\n")
+        meta_f.write(f"Date range: {date_range}\n")
+        meta_f.write(f"Number of images: {num_images}\n")
+        meta_f.write(f"Total image size (bytes): {total_image_bytes}\n")
+        meta_f.write(f"Total number of words: {total_words}\n")
+    logging.info(f"Metadata written to {metadata_path}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

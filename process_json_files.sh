@@ -4,13 +4,15 @@
 FILES=(
 
 
-  "DiaryEntriesFromBear/ListOfThingsNeverDone.json"
-  "DiaryEntriesFromBear/OMATA-NOTES__Continued_At_Week_202.json"
-   "DiaryEntriesFromBear/OMATA-NOTES__Continued_At_Week_182.json"
-   "DiaryEntriesFromBear/OMATA-NOTES_START_XYZ_Weeks_of_a_Hardware_Startup.json"
-   "DiaryEntriesFromBear/OMATA-NOTES_Year_5_Day_2_Week_209.json"
+   "DiaryEntriesFromBear/HALBHERR_SILCA_210727_1106_format.json"
 )
 
+
+#   "DiaryEntriesFromBear/ListOfThingsNeverDone.json"
+#   "DiaryEntriesFromBear/OMATA-NOTES__Continued_At_Week_202.json"
+#    "DiaryEntriesFromBear/OMATA-NOTES__Continued_At_Week_182.json"
+#    "DiaryEntriesFromBear/OMATA-NOTES_START_XYZ_Weeks_of_a_Hardware_Startup.json"
+#    "DiaryEntriesFromBear/OMATA-NOTES_Year_5_Day_2_Week_209.json"
 
 # Run for A5
 source .venv/bin/activate
