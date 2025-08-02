@@ -73,7 +73,7 @@ def add_entry_to_pdf(pdf, entry, config):
     date_text = entry["dateline"]
     pdf.cell(avail_w_mm, rect_height_mm, date_text, ln=True, align='L')
     pdf.set_text_color(0, 0, 0)  # Reset to black for body text
-    pdf.ln(rect_height_mm * 0.2)
+    pdf.ln(rect_height_mm * 0.8)
 
     # Text: treat each text_obj as a paragraph, let multi_cell handle wrapping
     pdf.set_font(config["text_font"], size=config["text_font_size"])
@@ -118,7 +118,7 @@ def add_entry_to_pdf(pdf, entry, config):
     # Add vertical gap after each diary entry
     pdf.ln(GAP_BETWEEN_ENTRIES_MM)
 
-def create_pdf_from_json(json_path, output_pdf, page_size="A5", date_font="DejaVuSans", date_font_size=18, text_font="DejaVuSans", text_font_size=12, line_spacing=1.3, margin_inch=0.35):
+def create_pdf_from_json(json_path, output_pdf=None, page_size="A5", date_font="3270NerdFont-Regular", date_font_size=18, text_font="WarblerText", text_font_size=12, line_spacing=1.3, margin_inch=0.35):
     margin_mm = inch_to_mm(margin_inch)
     config = {
         "page_size": PAGE_SIZES.get(page_size.upper(), PAGE_SIZES["A5"]),
@@ -130,30 +130,33 @@ def create_pdf_from_json(json_path, output_pdf, page_size="A5", date_font="DejaV
         "margin_mm": margin_mm
     }
     pdf = FPDF(unit="mm", format=config["page_size"])
-    # Register DejaVuSans font for Unicode support
-    font_path = "/Users/julian/Dropbox (Personal)/Projects By Year/@2025/OMATA Process Diary/ProcessDiaryEntries/dejavu-fonts-ttf-2.37/ttf/DejaVuSans.ttf"
-    pdf.add_font("DejaVuSans", "", font_path)
-    pdf.add_page()  # Ensure at least one page is open before writing
-    # Load diary JSON data
+    font_path = "/Users/julian/Dropbox (Personal)/Projects By Year/@2025/OMATA Process Diary/ProcessDiaryEntries/WarblerTextV1.2-Regular.otf"
+    pdf.add_font("WarblerText", "", font_path)
+    date_font_path = "/Users/julian/Dropbox (Personal)/Projects By Year/@2025/OMATA Process Diary/ProcessDiaryEntries/3270NerdFont-Regular.ttf"
+    pdf.add_font("3270NerdFont-Regular", "", date_font_path)
+    pdf.add_page()
     with open(json_path, "r", encoding="utf-8") as f:
         diary = json.load(f)
     for entry in diary["entries"]:
         add_entry_to_pdf(pdf, entry, config)
+    if not output_pdf:
+        output_pdf = os.path.splitext(json_path)[0] + ".pdf"
     pdf.output(output_pdf)
     logging.info(f"Created {output_pdf}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument("input_json", help="Input JSON file")
     parser.add_argument("--margin", type=float, default=0.35, help="Margin in inches (default: 0.35)")
     args = parser.parse_args()
     create_pdf_from_json(
-        "OMATA-NOTES  Continued At Week 182.json",
-        "OMATA_Diary_Print.pdf",
+        args.input_json,
+        None,
         page_size="A5",
-        date_font="DejaVuSans",
-        date_font_size=12,
-        text_font="DejaVuSans",
-        text_font_size=9,
+        date_font="3270NerdFont-Regular",
+        date_font_size=13,
+        text_font="WarblerText",
+        text_font_size=11,
         line_spacing=1,
         margin_inch=args.margin
     )
