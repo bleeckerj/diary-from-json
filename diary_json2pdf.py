@@ -86,7 +86,7 @@ def add_entry_to_pdf(pdf, entry, config):
         pdf.set_y(margin)
 
     # Date: colored rectangle full width (respecting margins), white text
-    date_left_pad_mm = 2.5
+    date_left_pad_mm = 1.5
     pdf.set_fill_color(0, 0, 0)
     pdf.rect(x=margin, y=pdf.get_y(), w=avail_w_mm, h=rect_height_mm, style='F')
     pdf.set_xy(margin + date_left_pad_mm, pdf.get_y())
@@ -175,7 +175,7 @@ if __name__ == "__main__":
     parser.add_argument("--date_font_size", type=int, default=11, help="Font size for date line")
     parser.add_argument("--text_font", type=str, default="WarblerText", help="Font for text")
     parser.add_argument("--text_font_size", type=int, default=9, help="Font size for text")
-    parser.add_argument("--line_spacing", type=float, default=1, help="Line spacing multiplier")
+    parser.add_argument("--line_spacing", type=float, default=1.2, help="Line spacing multiplier")
     args = parser.parse_args()
     create_pdf_from_json(
         args.input_json,
