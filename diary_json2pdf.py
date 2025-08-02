@@ -6,6 +6,7 @@ import os
 import base64
 import logging 
 import argparse
+import re
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -159,7 +160,9 @@ def create_pdf_from_json(json_path, output_pdf=None, page_size="A5", date_font="
     for entry in diary["entries"]:
         add_entry_to_pdf(pdf, entry, config)
     if not output_pdf:
-        output_pdf = os.path.splitext(json_path)[0] + ".pdf"
+        base, _ = os.path.splitext(os.path.basename(json_path))
+        base = re.sub(r'\s+', '_', base)
+        output_pdf = f"{base}_{page_size.upper()}.pdf"
     pdf.output(output_pdf)
     logging.info(f"Created {output_pdf}")
 
@@ -167,15 +170,21 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("input_json", help="Input JSON file")
     parser.add_argument("--margin", type=float, default=0.35, help="Margin in inches (default: 0.35)")
+    parser.add_argument("--page_size", type=str, default="A5", help="Page size (A4, A5, A6, etc.)")
+    parser.add_argument("--date_font", type=str, default="3270NerdFont-Regular", help="Font for date line")
+    parser.add_argument("--date_font_size", type=int, default=11, help="Font size for date line")
+    parser.add_argument("--text_font", type=str, default="WarblerText", help="Font for text")
+    parser.add_argument("--text_font_size", type=int, default=9, help="Font size for text")
+    parser.add_argument("--line_spacing", type=float, default=1, help="Line spacing multiplier")
     args = parser.parse_args()
     create_pdf_from_json(
         args.input_json,
         None,
-        page_size="A6",
-        date_font="3270NerdFont-Regular",
-        date_font_size=12,
-        text_font="WarblerText",
-        text_font_size=9,
-        line_spacing=1,
+        page_size=args.page_size,
+        date_font=args.date_font,
+        date_font_size=args.date_font_size,
+        text_font=args.text_font,
+        text_font_size=args.text_font_size,
+        line_spacing=args.line_spacing,
         margin_inch=args.margin
     )
