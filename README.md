@@ -41,6 +41,8 @@ python diary_json2pdf.py <input_json> [options]
 - `--text_font`: Font for text (default: WarblerText)
 - `--text_font_size`: Font size for text (default: 9)
 - `--line_spacing`: Line spacing multiplier (default: 1)
+- `--rect_corner_radius_mm`: Corner radius for left corners of date rectangle in millimeters (default: 2)
+- `--rect_fill_color`: Fill color for date rectangle as three RGB values, e.g. `--rect_fill_color 30 30 30`
 
 ### Output
 

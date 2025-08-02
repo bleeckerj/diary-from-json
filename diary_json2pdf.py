@@ -1,4 +1,10 @@
+import fpdf
 from fpdf import FPDF
+from PDFRounded import PDFRounded as FPDF
+
+print(fpdf.__file__)
+print(fpdf.__version__)
+
 from PIL import Image
 import json
 import io
@@ -66,7 +72,7 @@ def add_entry_to_pdf(pdf, entry, config):
     page_w = config["page_size"][0]
     page_h = config["page_size"][1]
     avail_w_mm = page_w - 2 * margin
-    rect_corner_radius = config.get("rect_corner_radius_mm", 4)  # Default 4mm radius
+    rect_corner_radius = config.get("rect_corner_radius_mm", 2)  # Default 2mm radius
 
     # Heights
     rect_height_mm = pt_to_mm(config["date_font_size"]) * config["line_spacing"] * 1.5
@@ -93,8 +99,9 @@ def add_entry_to_pdf(pdf, entry, config):
     rect_y = pdf.get_y()
     fill_color = config.get("rect_fill_color", (0, 0, 0))  # Default black
     pdf.set_fill_color(*fill_color)
-    # Draw rounded rectangle (left corners only)
-    pdf.rounded_rect(rect_x, rect_y, rect_w, rect_height_mm, rect_corner_radius, style='F', corners='11')  # '11' = round top-left and bottom-left
+
+
+    pdf.rounded_rect(rect_x, rect_y, rect_w, rect_height_mm, 2, 'F', '13')
 
     pdf.set_xy(margin + date_left_pad_mm, rect_y)
     pdf.set_text_color(255, 255, 255)
@@ -145,7 +152,7 @@ def add_entry_to_pdf(pdf, entry, config):
                 )
     pdf.ln(GAP_BETWEEN_ENTRIES_MM)
 
-def create_pdf_from_json(json_path, output_pdf=None, page_size="A5", date_font="3270NerdFont-Regular", date_font_size=18, text_font="WarblerText", text_font_size=12, line_spacing=1.3, margin_inch=0.35, rect_corner_radius_mm=4, rect_fill_color=(0,0,0)):
+def create_pdf_from_json(json_path, output_pdf=None, page_size="A5", date_font="3270NerdFont-Regular", date_font_size=18, text_font="WarblerText", text_font_size=12, line_spacing=1.3, margin_inch=0.35, rect_corner_radius_mm=2, rect_fill_color=(0,0,0)):
     margin_mm = inch_to_mm(margin_inch)
     config = {
         "page_size": PAGE_SIZES.get(page_size.upper(), PAGE_SIZES["A5"]),
@@ -185,7 +192,7 @@ if __name__ == "__main__":
     parser.add_argument("--text_font", type=str, default="WarblerText", help="Font for text")
     parser.add_argument("--text_font_size", type=int, default=9, help="Font size for text")
     parser.add_argument("--line_spacing", type=float, default=1.2, help="Line spacing multiplier")
-    parser.add_argument("--rect_corner_radius_mm", type=float, default=4, help="Corner radius for left corners of date rectangle (mm)")
+    parser.add_argument("--rect_corner_radius_mm", type=float, default=2, help="Corner radius for left corners of date rectangle (mm)")
     parser.add_argument("--rect_fill_color", type=int, nargs=3, default=[0,0,0], help="Fill color for date rectangle as three RGB values, e.g. --rect_fill_color 30 30 30")
     args = parser.parse_args()
     create_pdf_from_json(
