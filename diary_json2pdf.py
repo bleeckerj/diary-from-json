@@ -60,11 +60,17 @@ def add_entry_to_pdf(pdf, entry, config):
     page_w = config["page_size"][0]
     avail_w_mm = page_w - 2 * margin
 
-    # Date
+    # Date: colored rectangle full width, white text
+    rect_height_mm = pt_to_mm(config["date_font_size"]) * config["line_spacing"] * 1.5
+    pdf.set_fill_color(0, 0, 0)  # Black in RGB
+    pdf.rect(x=0, y=pdf.get_y(), w=page_w, h=rect_height_mm, style='F')
+    pdf.set_xy(0, pdf.get_y())
+    pdf.set_text_color(255, 255, 255)  # White text (RGB)
     pdf.set_font(config["date_font"], size=config["date_font_size"])
     date_text = entry["dateline"]
-    pdf.cell(0, pt_to_mm(config["date_font_size"]), date_text, ln=True)
-    pdf.ln(pt_to_mm(config["date_font_size"]) * config["line_spacing"] / 2)
+    pdf.cell(page_w, rect_height_mm, date_text, ln=True, align='L')
+    pdf.set_text_color(0, 0, 0)  # Reset to black for body text
+    pdf.ln(rect_height_mm * 0.2)
 
     # Text: treat each text_obj as a paragraph, let multi_cell handle wrapping
     pdf.set_font(config["text_font"], size=config["text_font_size"])
