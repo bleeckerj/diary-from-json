@@ -54,14 +54,20 @@ def extract_date_lines(filepath):
     logging.info(f"Processing {total} lines...")
     # First, collect all date line indices, log progress every 10,000 lines
     date_indices = []
+    import re
     i = 0
+    inside_image_block = False
+    image_start = None
+    image_type = None
+    base64_data = ''
+    image_end = None
     while i < total:
         line = lines[i]
+        stripped = line.strip()
         if (i+1) % 10000 == 0:
             logging.info(f"Progress: processed {i+1}/{total} lines...")
-        stripped = line.strip()
         # Detect start of image block
-        if stripped.startswith("![](data:image/"):
+        if not inside_image_block and stripped.startswith("![](data:image/"):
             logging.info(f"Semantic element detected: IMAGE at line {i+1}")
             image_type = None
             base64_start = line.find('base64,')
@@ -77,24 +83,37 @@ def extract_date_lines(filepath):
             if ')' in line:
                 base64_data = line[base64_start+7:line.find(')')].strip() if base64_start != -1 else ''
                 image_end = i
+                size_bytes = int(len(base64_data) * 3 / 4) if base64_data else 0
+                image_snippet = base64_data[:40] + ('...' if len(base64_data) > 40 else '')
+                logging.info(f"Image detected at lines {image_start+1}-{image_end+1}: type={image_type}, size~{size_bytes} bytes, snippet='{image_snippet}'")
+                i += 1
+                continue
             else:
-                # Accumulate lines until closing parenthesis
+                # Start accumulating image block
                 if base64_start != -1:
                     base64_data = line[base64_start+7:].strip()
-                j = i + 1
-                while j < total:
-                    next_line = lines[j]
-                    base64_data += next_line.strip()
-                    if ')' in next_line:
-                        image_end = j
-                        break
-                    j += 1
-                i = image_end
-            size_bytes = int(len(base64_data) * 3 / 4) if base64_data else 0
-            image_snippet = base64_data[:40] + ('...' if len(base64_data) > 40 else '')
-            logging.info(f"Image detected at lines {image_start+1}-{image_end+1}: type={image_type}, size~{size_bytes} bytes, snippet='{image_snippet}'")
-            i += 1
-            continue
+                inside_image_block = True
+                image_end = i
+                i += 1
+                continue
+        elif inside_image_block:
+            # Accumulate base64 lines until closing parenthesis
+            base64_data += stripped
+            if ')' in line:
+                image_end = i
+                size_bytes = int(len(base64_data) * 3 / 4) if base64_data else 0
+                image_snippet = base64_data[:40] + ('...' if len(base64_data) > 40 else '')
+                logging.info(f"Image detected at lines {image_start+1}-{image_end+1}: type={image_type}, size~{size_bytes} bytes, snippet='{image_snippet}'")
+                inside_image_block = False
+                image_start = None
+                image_type = None
+                base64_data = ''
+                image_end = None
+                i += 1
+                continue
+            else:
+                i += 1
+                continue
         # Only run date detection on non-image lines
         if is_date_line(line, nlp):
             logging.info(f"Semantic element detected: DATELINE at line {i+1}")
@@ -128,19 +147,32 @@ def extract_date_lines(filepath):
             if content.strip() == "":
                 j += 1
                 continue
-            # Detect start of image block
-            if content.strip().startswith("![](data:image/"):
+            # Handle inline images: split line at ![](data:image/
+            img_marker = "![](data:image/"
+            if img_marker in content:
+                img_start_idx = content.find(img_marker)
+                text_part = content[:img_start_idx].strip()
+                image_part = content[img_start_idx:]
+                # Add text before image (if any)
+                if text_part:
+                    entry_text_lines.append({
+                        "text": text_part,
+                        "line": j + 1,
+                        "filename": filepath
+                    })
+                    word_count += len(text_part.split())
+                # Now process image block
                 image_type = None
-                base64_start = content.find('base64,')
+                base64_start = image_part.find('base64,')
                 try:
-                    image_type = content.split('![](data:image/')[1].split(';')[0]
+                    image_type = image_part.split('![](data:image/')[1].split(';')[0]
                 except Exception:
                     image_type = 'unknown'
                 image_start = j
                 image_end = j
-                image_data = content
+                image_data = image_part
                 # If image is multi-line, accumulate until closing parenthesis
-                if ')' not in content:
+                if ')' not in image_part:
                     k = j + 1
                     while k < next_date_idx:
                         next_line = lines[k].rstrip('\n')
