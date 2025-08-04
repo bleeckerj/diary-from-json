@@ -58,7 +58,8 @@ python3 diary_json2pdf.py DiaryEntriesFromBear/OMATA-NOTES__Continued_At_Week_18
 ### Output
 
 - The generated JSON will be saved alongside the input markdown file.
-- The generated PDF will be saved in the same directory as the input JSON file, with a name like `OMATA-NOTES__Continued_At_Week_182_A5.pdf`.
+- The generated PDF will be saved in the same directory as the input JSON file, with a name like `OMATA-NOTES__Continued_At_Week_182_A5_9pt.pdf`, where `9pt` reflects the text font size used.
+- The metadata file will also include the text font size in its name, e.g. `OMATA-NOTES__Continued_At_Week_182_A5_9pt.metadata.txt`.
 
 ## Fonts
 

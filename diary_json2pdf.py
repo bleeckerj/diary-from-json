@@ -234,7 +234,7 @@ def create_pdf_from_json(json_path, output_pdf=None, page_size="A5", date_font="
         base = re.sub(r'\s+', '_', base)
         # Output PDF should be in the same directory as the input file
         input_dir = os.path.dirname(json_path)
-        output_pdf = os.path.join(input_dir, f"{base}_{page_size.upper()}.pdf")
+        output_pdf = os.path.join(input_dir, f"{base}_{page_size.upper()}_{text_font_size}pt.pdf")
     pdf.output(output_pdf)
     logging.info(f"Created {output_pdf}")
 
